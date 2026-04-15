@@ -231,20 +231,30 @@ async function startBot() {
     }
 
     const { state, saveCreds } = await useMultiFileAuthState(SESSION_PATH)
-    const { version } = await fetchLatestBaileysVersion()
+    
+    // 🔥 AMBIL VERSI TERBARU DENGAN FALLBACK
+    let version
+    try {
+        const { version: latestVersion } = await fetchLatestBaileysVersion()
+        version = latestVersion
+        console.log(`📡 Menggunakan WhatsApp Web v${version.join('.')}`)
+    } catch {
+        version = [2, 3000, 1015901307]
+        console.log(`⚠️ Gagal mengambil versi terbaru, menggunakan fallback: ${version.join('.')}`)
+    }
 
     const sock = makeWASocket({
-        version: [2, 3000, 1015901307], // Gunakan versi stable yang sudah teruji
+        version,
         auth: state,
         logger: P({ level: "silent" }),
         printQRInTerminal: false,
         browser: ["Ubuntu", "Chrome", "20.0.0"],
         syncFullHistory: false,
-        shouldSyncHistoryMessage: () => false, // 🔥 TOLAK sinkronisasi chat lama (Mencegah Loading Lama)
+        shouldSyncHistoryMessage: () => false,
         markOnline: true,
         connectTimeoutMs: 60000,
-        defaultQueryTimeoutMs: 0,
-        keepAliveIntervalMs: 10000
+        defaultQueryTimeoutMs: 10000,
+        keepAliveIntervalMs: 15000
     })
 
     sock.ev.on("creds.update", saveCreds)
@@ -260,19 +270,31 @@ async function startBot() {
         }
         if (connection === "close") {
             isConnecting = false
-            const reason = lastDisconnect?.error?.output?.statusCode
-            console.log("❌ Koneksi terputus, alasan:", reason)
+            const statusCode = lastDisconnect?.error?.output?.statusCode || lastDisconnect?.error?.output?.payload?.statusCode
+            
+            // 📝 Mapping Alasan Putus Koneksi
+            const reasonMap = {
+                [DisconnectReason.badSession]: "Sesi Rusak (Silakan hapus session)",
+                [DisconnectReason.connectionClosed]: "Koneksi Tertutup",
+                [DisconnectReason.connectionLost]: "Koneksi Hilang dari Server",
+                [DisconnectReason.connectionTimedOut]: "Koneksi Timeout",
+                [DisconnectReason.loggedOut]: "Perangkat Terkeluar (Logged Out)",
+                [DisconnectReason.restartRequired]: "Perlu Restart",
+                [DisconnectReason.timedOut]: "Waktu Habis",
+                [428]: "Precondition Required (Mungkin masalah versi)",
+                [401]: "Unauthorized (Sesi tidak valid)",
+            }
+            const reasonText = reasonMap[statusCode] || "Alasan Tidak Diketahui"
+            console.log(`❌ Koneksi Terputus | Alasan: ${reasonText} (${statusCode})`)
 
-            const shouldReconnect = reason !== DisconnectReason.loggedOut
+            const shouldReconnect = statusCode !== DisconnectReason.loggedOut
             if (shouldReconnect) {
                 pairingPrinted = false
                 pairingCodeRequested = false
-                console.log("🔄 Koneksi terputus. Mencoba menghubungkan ulang dalam 5 detik...")
+                console.log("🔄 Mencoba menghubungkan ulang dalam 5 detik...")
                 setTimeout(startBot, 5000)
             } else {
-                console.log("🛑 Sesi Berakhir (Logged Out).")
-                console.log("Jika ini terjadi di server, silakan hapus folder 'session' dan jalankan ulang di lokal untuk mendapatkan pairing code baru.")
-                // fs.removeSync("./session") // Opsional: hapus sesi jika benar-benar ingin reset
+                console.log("🛑 Sesi Berakhir Permanen (Logged Out).")
                 process.exit(0)
             }
         }
