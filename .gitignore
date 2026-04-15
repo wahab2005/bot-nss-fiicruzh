@@ -1,0 +1,10 @@
+node_modules
+.env
+data/
+# Jika tidak menggunakan folder data, abaikan ini:
+session/
+database.json
+*.mp3
+*.mp4
+*.ogg
+.DS_Store
