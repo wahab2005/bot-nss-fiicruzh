@@ -62,12 +62,6 @@ let db = {
 
 function loadDb() {
     try {
-        // 🔥 FITUR RESET DATABASE (Hapus memori bot jika RESET_DATABASE=true)
-        if (process.env.RESET_DATABASE === "true") {
-            console.log("⚠️ RESET_DATABASE terdeteksi. Menghapus data/database.json...")
-            if (fs.existsSync(DB_PATH)) fs.removeSync(DB_PATH)
-        }
-
         if (fs.existsSync(DB_PATH)) {
             db = fs.readJsonSync(DB_PATH)
             // Migration & Safety
@@ -218,43 +212,14 @@ async function startBot() {
     if (isConnecting) return
     isConnecting = true
 
-    // 🔥 FITUR NUCLEAR RESET (Hapus Sesi jika RESET_SESSION=true di Railway)
-    const SESSION_PATH = "./data/session"
-    if (process.env.RESET_SESSION === "true") {
-        console.log("⚠️ RESET_SESSION terdeteksi. Menghapus folder sesi lama...")
-        try {
-            fs.removeSync(SESSION_PATH)
-            console.log("✅ Folder sesi berhasil dihapus.")
-        } catch (err) {
-            console.error("❌ Gagal menghapus folder sesi:", err.message)
-        }
-    }
-
-    const { state, saveCreds } = await useMultiFileAuthState(SESSION_PATH)
-    
-    // 🔥 AMBIL VERSI TERBARU DENGAN FALLBACK
-    let version
-    try {
-        const { version: latestVersion } = await fetchLatestBaileysVersion()
-        version = latestVersion
-        console.log(`📡 Menggunakan WhatsApp Web v${version.join('.')}`)
-    } catch {
-        version = [2, 3000, 1015901307]
-        console.log(`⚠️ Gagal mengambil versi terbaru, menggunakan fallback: ${version.join('.')}`)
-    }
+    const { state, saveCreds } = await useMultiFileAuthState("./data/session")
+    const { version } = await fetchLatestBaileysVersion()
 
     const sock = makeWASocket({
         version,
         auth: state,
         logger: P({ level: "silent" }),
-        printQRInTerminal: false,
-        browser: ["Ubuntu", "Chrome", "20.0.0"],
-        syncFullHistory: false,
-        shouldSyncHistoryMessage: () => false,
-        markOnline: true,
-        connectTimeoutMs: 60000,
-        defaultQueryTimeoutMs: 10000,
-        keepAliveIntervalMs: 15000
+        printQRInTerminal: false
     })
 
     sock.ev.on("creds.update", saveCreds)
@@ -270,31 +235,19 @@ async function startBot() {
         }
         if (connection === "close") {
             isConnecting = false
-            const statusCode = lastDisconnect?.error?.output?.statusCode || lastDisconnect?.error?.output?.payload?.statusCode
-            
-            // 📝 Mapping Alasan Putus Koneksi
-            const reasonMap = {
-                [DisconnectReason.badSession]: "Sesi Rusak (Silakan hapus session)",
-                [DisconnectReason.connectionClosed]: "Koneksi Tertutup",
-                [DisconnectReason.connectionLost]: "Koneksi Hilang dari Server",
-                [DisconnectReason.connectionTimedOut]: "Koneksi Timeout",
-                [DisconnectReason.loggedOut]: "Perangkat Terkeluar (Logged Out)",
-                [DisconnectReason.restartRequired]: "Perlu Restart",
-                [DisconnectReason.timedOut]: "Waktu Habis",
-                [428]: "Precondition Required (Mungkin masalah versi)",
-                [401]: "Unauthorized (Sesi tidak valid)",
-            }
-            const reasonText = reasonMap[statusCode] || "Alasan Tidak Diketahui"
-            console.log(`❌ Koneksi Terputus | Alasan: ${reasonText} (${statusCode})`)
+            const reason = lastDisconnect?.error?.output?.statusCode
+            console.log("❌ Koneksi terputus, alasan:", reason)
 
-            const shouldReconnect = statusCode !== DisconnectReason.loggedOut
+            const shouldReconnect = reason !== DisconnectReason.loggedOut
             if (shouldReconnect) {
                 pairingPrinted = false
                 pairingCodeRequested = false
-                console.log("🔄 Mencoba menghubungkan ulang dalam 5 detik...")
+                console.log("🔄 Koneksi terputus. Mencoba menghubungkan ulang dalam 5 detik...")
                 setTimeout(startBot, 5000)
             } else {
-                console.log("🛑 Sesi Berakhir Permanen (Logged Out).")
+                console.log("🛑 Sesi Berakhir (Logged Out).")
+                console.log("Jika ini terjadi di server, silakan hapus folder 'session' dan jalankan ulang di lokal untuk mendapatkan pairing code baru.")
+                // fs.removeSync("./session") // Opsional: hapus sesi jika benar-benar ingin reset
                 process.exit(0)
             }
         }
