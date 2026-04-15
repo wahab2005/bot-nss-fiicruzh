@@ -232,7 +232,11 @@ async function startBot() {
         auth: state,
         logger: P({ level: "silent" }),
         printQRInTerminal: false,
-        browser: ["Ubuntu", "Chrome", "20.0.0"]
+        browser: ["Ubuntu", "Chrome", "20.0.0"],
+        syncFullHistory: false, // Menghindari hang saat load chat lama
+        markOnline: true,       // Memastikan bot terlihat online saat baru pairing
+        connectTimeoutMs: 60000, // Memberi waktu lebih lama untuk jabat tangan (handshake)
+        defaultQueryTimeoutMs: 0 // Menghindari timeout saat jaringan lambat
     })
 
     sock.ev.on("creds.update", saveCreds)
