@@ -35,7 +35,7 @@ try {
 }
 ffmpeg.setFfmpegPath(ffmpegCmd)
 
-const PHONE_NUMBER = process.env.PHONE_NUMBER || "628979700981"
+const PHONE_NUMBER = process.env.PHONE_NUMBER || "6287886582175"
 const API_KEY = process.env.GROQ_API_KEY || "GANTI_API_KEY"
 
 if (!PHONE_NUMBER || PHONE_NUMBER === "628xxx") {
@@ -62,6 +62,12 @@ let db = {
 
 function loadDb() {
     try {
+        // 🔥 FITUR RESET DATABASE (Hapus memori bot jika RESET_DATABASE=true)
+        if (process.env.RESET_DATABASE === "true") {
+            console.log("⚠️ RESET_DATABASE terdeteksi. Menghapus data/database.json...")
+            if (fs.existsSync(DB_PATH)) fs.removeSync(DB_PATH)
+        }
+
         if (fs.existsSync(DB_PATH)) {
             db = fs.readJsonSync(DB_PATH)
             // Migration & Safety
@@ -228,15 +234,17 @@ async function startBot() {
     const { version } = await fetchLatestBaileysVersion()
 
     const sock = makeWASocket({
-        version,
+        version: [2, 3000, 1015901307], // Gunakan versi stable yang sudah teruji
         auth: state,
         logger: P({ level: "silent" }),
         printQRInTerminal: false,
         browser: ["Ubuntu", "Chrome", "20.0.0"],
-        syncFullHistory: false, // Menghindari hang saat load chat lama
-        markOnline: true,       // Memastikan bot terlihat online saat baru pairing
-        connectTimeoutMs: 60000, // Memberi waktu lebih lama untuk jabat tangan (handshake)
-        defaultQueryTimeoutMs: 0 // Menghindari timeout saat jaringan lambat
+        syncFullHistory: false,
+        shouldSyncHistoryMessage: () => false, // 🔥 TOLAK sinkronisasi chat lama (Mencegah Loading Lama)
+        markOnline: true,
+        connectTimeoutMs: 60000,
+        defaultQueryTimeoutMs: 0,
+        keepAliveIntervalMs: 10000
     })
 
     sock.ev.on("creds.update", saveCreds)
