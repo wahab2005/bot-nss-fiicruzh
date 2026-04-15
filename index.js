@@ -35,7 +35,7 @@ try {
 }
 ffmpeg.setFfmpegPath(ffmpegCmd)
 
-const PHONE_NUMBER = process.env.PHONE_NUMBER || "6287886582175"
+const PHONE_NUMBER = process.env.PHONE_NUMBER || "628979700981"
 const API_KEY = process.env.GROQ_API_KEY || "GANTI_API_KEY"
 
 if (!PHONE_NUMBER || PHONE_NUMBER === "628xxx") {
